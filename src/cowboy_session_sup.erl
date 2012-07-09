@@ -1,13 +1,15 @@
 -module(cowboy_session_sup).
--behaviour(esupervisor).
--include_lib("esupervisor/include/esupervisor.hrl").
-
-
+-behaviour(supervisor).
 %% API
 -export([start_link/0, start_link/1]).
 
 %% Supervisor callbacks
 -export([init/1]).
+
+-define(CHILD(I, StartFunc, Restart), {I, StartFunc,
+				       temporary,
+				       5000,
+				       Restart, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -17,7 +19,7 @@ start_link() ->
     start_link(cowboy_session_default_handler).
 
 start_link(Handler) ->
-    esupervisor:start_link({local, ?MODULE}, ?MODULE, [Handler]).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, [Handler]).
 
 %% ===================================================================
 %% Supervisor callbacks
@@ -25,19 +27,8 @@ start_link(Handler) ->
 
 
 init([Handler]) ->
-    #one_for_one{
-      children = [
-                  #simple_one_for_one{
-                           id = {cowboy_session_server_sup, Handler},
-                           registered = cowboy_session_server_sup,
-                           children = [
-	                           #worker{       
-		                           id = cowboy_session_server,
-		                           restart = transient,
-		                           start_func = {cowboy_session_server, start_link, [Handler]}
-		                        }
-	                        ]
-                         }
-                 ]
-     }.
-
+    {ok, {{simple_one_for_one, 0, 1},
+	  [?CHILD(cowboy_session_server,
+		  {cowboy_session_server, start_link, [Handler]},
+		  transient)
+	  ]}}.

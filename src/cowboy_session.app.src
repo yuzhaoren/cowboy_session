@@ -7,8 +7,7 @@
                   kernel,
                   stdlib,
                   gproc,
-                  ossp_uuid,
-                  esupervisor
+                  ossp_uuid
                  ]},
   {mod, { cowboy_session_app, []}},
   {env, []}
