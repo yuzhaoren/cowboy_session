@@ -5,7 +5,7 @@
 %% API
 -export([start_link/3, command/2, handler_state/1, 
          session_id/1, session_id/2, touch/1,
-         stop/1]).
+	 stop/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -124,8 +124,8 @@ handle_cast(stop, #state{ handler = Handler, handler_state = HandlerState, sessi
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(_Info, State) ->
-    {noreply, State}.
+handle_info(Info, #state{handler=Handler, handler_state=HandlerState, session=Session}=State) ->
+    {noreply, State#state{handler_state=Handler:info(Info, Session, HandlerState)}}.
 
 %%--------------------------------------------------------------------
 %% @private
