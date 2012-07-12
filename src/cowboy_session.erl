@@ -33,11 +33,13 @@ delete_session(Req, Handler) ->
 	    Req;
 	_B ->
 	    {Session, Req1} = get_session(Req, Handler),
-	    Handler:stop(Session),
-	    {ok, Req1} = cowboy_http_req:set_resp_cookie(CookieName, <<"deleted">>,
+	    HandlerState = cowboy_session_server:handler_state(Session),
+	    Options = Handler:cookie_options(HandlerState),
+	    cowboy_session_server:stop(Session),
+	    {ok, Req2} = cowboy_http_req:set_resp_cookie(CookieName, <<"deleted">>,
 							 [{set_age, 0},
-							  {local_time, {{1970,1,1},{0,0,0}}}], Req),
-	    Req1
+							  {local_time, {{1970,1,1},{0,0,0}}}|Options], Req1),
+	    Req2
     end.
 
 get_or_create(Req, Handler) ->
@@ -62,7 +64,7 @@ create_session(Req, Handler) ->
 		     _ ->
 			 Handler:validate(Session)
 		 end,
-    {ok, Pid} = supervisor:start_child(cowboy_session_server_sup, [NewSession, Handler:session_name(NewSession)]),
+    {ok, Pid} = supervisor:start_child(cowboy_session_server_sup, [Handler, NewSession, Handler:session_name(NewSession)]),
     HandlerState = cowboy_session_server:handler_state(Pid),
     Options = Handler:cookie_options(HandlerState),
     ResponseSession = cowboy_session_server:session_id(Pid),

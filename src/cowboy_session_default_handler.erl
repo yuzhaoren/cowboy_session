@@ -3,19 +3,19 @@
          touch/2, handle/3, init/2]).
 
 cookie_name() ->
-   <<"_session">>.
+    <<"_session">>.
 
 cookie_options(_HandlerState) ->
-   [{path, <<"/">>}].
+    [{path, <<"/">>}].
 
 generate() ->
-   ossp_uuid:make(v4, text).
+    ossp_uuid:make(v4, text).
 
 session_name(Session) ->
-   Session.
+    Session.
 
 validate(Session) ->
-   Session.
+    Session.
 
 -spec init(binary(), any()) -> any().
 init(_Session, _SessionName) ->
@@ -30,5 +30,5 @@ touch(_Session, State) ->
     State.
 
 -spec handle(any(), binary(), any()) -> {any(), any()}.
-handle(_Command, _Session, _State) ->
-   ok.
+handle(_Command, _Session, State) ->
+    {ok, State}.
