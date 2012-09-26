@@ -3,19 +3,20 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/3, command/2, handler_state/1, 
-         session_id/1, session_id/2, touch/1,
-	 stop/1]).
+-export([start_link/3, command/2, handler_state/1,
+    session_id/1, session_id/2, touch/1,
+    stop/1]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+    terminate/2, code_change/3]).
 
 -record(state, {
-          handler,
-	  handler_state,
-          session
-         }).
+    handler,
+    handler_state,
+    session,
+    timeout
+    }).
 
 %%%===================================================================
 %%% API
@@ -34,10 +35,10 @@ session_id(Server, Session) ->
     gen_server:cast(Server, {session_id, Session}).
 
 touch(Server) ->
-	  gen_server:cast(Server, touch).
+    gen_server:cast(Server, touch).
 
 stop(Server) ->
-	  gen_server:cast(Server, stop).
+    gen_server:cast(Server, stop).
 %%--------------------------------------------------------------------
 %% @doc
 %% Starts the server
@@ -46,7 +47,9 @@ stop(Server) ->
 %% @end
 %%--------------------------------------------------------------------
 start_link(Handler, Session, SessionName) ->
-    gen_server:start_link(?MODULE, [Handler, Session, SessionName], []).
+    start_link(Handler, Session, SessionName, infinity);
+start_link(Handler, Session, SessionName, Timeout) ->
+    gen_server:start_link(?MODULE, [Handler, Session, SessionName, Timeout], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -63,14 +66,17 @@ start_link(Handler, Session, SessionName) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Handler, Session, SessionName]) ->
+init([Handler, Session, SessionName, Timeout]) ->
     gproc:add_local_name({cowboy_session, SessionName}),
     HandlerState = Handler:init(Session, SessionName),
-    {ok, #state{
-       session = Session,
-       handler_state = HandlerState,
-       handler = Handler
-      }}.
+    T = Handler:timeout(Session,SessionName,Timeout),
+    State = #state{
+        session=Session,
+        handler_state=HandlerState,
+        handler=Handler,
+        timeout=T
+    },
+    {ok, State, Timeout}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -86,13 +92,13 @@ init([Handler, Session, SessionName]) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_call(session_id, _From, #state{ session = Session } = State) ->
-    {reply, Session, State};
-handle_call(handler_state, _From, #state{ handler_state = HandlerState } = State) ->
-    {reply, HandlerState, State};
-handle_call({command, Command}, _From, #state{ handler = Handler, handler_state = HandlerState, session = Session } = State) ->
+handle_call(session_id, _From, #state{session=Session, timeout=Timeout} = State) ->
+    {reply, Session, State, Timeout};
+handle_call(handler_state, _From, #state{handler_state=HandlerState, timeout=Timeout} = State) ->
+    {reply, HandlerState, State, Timeout};
+handle_call({command, Command}, _From, #state{handler=Handler, handler_state=HandlerState, session=Session, timeout=Timeout} = State) ->
     {Reply, HandlerState1} = Handler:handle(Command, Session, HandlerState),
-    {reply, Reply, State#state{ handler_state = HandlerState1 }}.
+    {reply, Reply, State#state{handler_state=HandlerState1}, Timeout}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -104,13 +110,12 @@ handle_call({command, Command}, _From, #state{ handler = Handler, handler_state 
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({session_id, NewSession}, #state{} = State) ->
-    {noreply, State#state{ session = NewSession }};
-handle_cast(touch, #state{ handler = Handler, handler_state = HandlerState, session = Session } = State) ->
+handle_cast({session_id, NewSession}, #state{timeout=Timeout} = State) ->
+    {noreply, State#state{session=NewSession},Timeout};
+handle_cast(touch, #state{handler=Handler, handler_state=HandlerState, session=Session,timeout=Timeout} = State) ->
     HandlerState1 = Handler:touch(Session, HandlerState),
-    {noreply, State#state{ handler_state = HandlerState1 }};
-
-handle_cast(stop, #state{ handler = Handler, handler_state = HandlerState, session = Session } = State) ->
+    {noreply, State#state{handler_state=HandlerState1},Timeout};
+handle_cast(stop, #state{handler=Handler, handler_state=HandlerState, session=Session} = State) ->
     Handler:stop(Session, HandlerState),
     {stop, normal, State}.
 
@@ -124,8 +129,10 @@ handle_cast(stop, #state{ handler = Handler, handler_state = HandlerState, sessi
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_info(Info, #state{handler=Handler, handler_state=HandlerState, session=Session}=State) ->
-    {noreply, State#state{handler_state=Handler:info(Info, Session, HandlerState)}}.
+handle_info(timeout,#state{handler=Handler,handler_state=HandlerState, session=Session} = State) ->
+    {stop, timeout, State#state{handler_state=Handler:timeout_state(Session,HandlerState)}};
+handle_info(Info, #state{handler=Handler, handler_state=HandlerState, session=Session,timeout=Timeout} = State) ->
+    {noreply, State#state{handler_state=Handler:info(Info, Session, HandlerState)},Timeout}.
 
 %%--------------------------------------------------------------------
 %% @private
