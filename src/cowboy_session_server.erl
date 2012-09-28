@@ -47,9 +47,7 @@ stop(Server) ->
 %% @end
 %%--------------------------------------------------------------------
 start_link(Handler, Session, SessionName) ->
-    start_link(Handler, Session, SessionName, infinity);
-start_link(Handler, Session, SessionName, Timeout) ->
-    gen_server:start_link(?MODULE, [Handler, Session, SessionName, Timeout], []).
+    gen_server:start_link(?MODULE, [Handler, Session, SessionName], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -66,15 +64,15 @@ start_link(Handler, Session, SessionName, Timeout) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([Handler, Session, SessionName, Timeout]) ->
+init([Handler, Session, SessionName]) ->
     gproc:add_local_name({cowboy_session, SessionName}),
     HandlerState = Handler:init(Session, SessionName),
-    T = Handler:timeout(Session,SessionName,Timeout),
+    Timeout = Handler:timeout(Session),
     State = #state{
         session=Session,
         handler_state=HandlerState,
         handler=Handler,
-        timeout=T
+        timeout=Timeout
     },
     {ok, State, Timeout}.
 
@@ -130,7 +128,8 @@ handle_cast(stop, #state{handler=Handler, handler_state=HandlerState, session=Se
 %% @end
 %%--------------------------------------------------------------------
 handle_info(timeout,#state{handler=Handler,handler_state=HandlerState, session=Session} = State) ->
-    {stop, timeout, State#state{handler_state=Handler:timeout_state(Session,HandlerState)}};
+    ExpState = Handler:handle_expired(Session,HandlerState),
+    {stop, timeout, State#state{handler_state=ExpState}};
 handle_info(Info, #state{handler=Handler, handler_state=HandlerState, session=Session,timeout=Timeout} = State) ->
     {noreply, State#state{handler_state=Handler:info(Info, Session, HandlerState)},Timeout}.
 

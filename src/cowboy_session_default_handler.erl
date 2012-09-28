@@ -1,6 +1,6 @@
 -module(cowboy_session_default_handler).
 -export([cookie_name/0, cookie_options/1, session_name/1, generate/0, stop/2, validate/1,
-         touch/2, handle/3, init/2]).
+         timeout/1, handle_expired/2, touch/2, handle/3, init/2]).
 
 cookie_name() ->
     <<"_session">>.
@@ -13,6 +13,10 @@ generate() ->
 
 session_name(Session) ->
     Session.
+
+-spec timeout(binary()) -> int().
+timeout(_Session) ->
+    infinity.
 
 validate(Session) ->
     Session.
@@ -32,3 +36,6 @@ touch(_Session, State) ->
 -spec handle(any(), binary(), any()) -> {any(), any()}.
 handle(_Command, _Session, State) ->
     {ok, State}.
+-spec handle_expired(binary(), any()) -> any().
+handle_expired(_Session,HandlerState) ->
+    HandlerState.
