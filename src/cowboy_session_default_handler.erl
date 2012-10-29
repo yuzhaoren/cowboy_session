@@ -14,7 +14,7 @@ generate() ->
 session_name(Session) ->
     Session.
 
--spec timeout(binary()) -> int().
+-spec timeout(binary()) -> integer().
 timeout(_Session) ->
     infinity.
 
