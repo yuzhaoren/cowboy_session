@@ -74,12 +74,12 @@ create_session(Req, Handler) ->
 get_session(Req, Handler) ->
     case get_cookie(Handler:cookie_name(), Req) of
 	undefined ->
-	    no_session;
+	    undefined;
 	B ->
 	    SessionName = Handler:session_name(B),
 	    case gproc:lookup_local_name({cowboy_session, SessionName}) of
 		undefined ->
-		    no_session;
+		    undefined;
 		Pid1 ->
 		    cowboy_session_server:touch(Pid1),
 		    {Pid1, Req}
