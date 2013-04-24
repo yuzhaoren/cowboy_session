@@ -25,16 +25,14 @@ from_request(Req) ->
 
                                                 % Workflow two, manual
 delete_session(Req, Handler) ->
-    CookieName = Handler:cookie_name(),
-    case get_cookie(CookieName, Req) of
+    case get_session(Req, Handler) of
         undefined ->
             Req;
-        _B ->
-            {Session, Req1} = get_session(Req, Handler),
+        {Session, Req1} ->
             HandlerState = cowboy_session_server:handler_state(Session),
             Options = Handler:cookie_options(HandlerState),
             cowboy_session_server:stop(Session),
-            cowboy_req:set_resp_cookie(CookieName, <<"deleted">>,
+            cowboy_req:set_resp_cookie(Handler:cookie_name(), <<"deleted">>,
                                        [{set_age, 0},
                                         {local_time, {{1970,1,1},{0,0,0}}}|Options], Req1)
     end.
